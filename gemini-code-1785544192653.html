@@ -121,19 +121,20 @@
     <div id="estado">Estado: Desconectado</div>
 
     <script>
-        // Banco de las 9 preguntas vinculadas a los pines (P1 a P9)
-        const preguntas = [
-            { texto: "1. ¿Dónde comienza la digestión y se trituran los alimentos?", respuesta: "boca" },
-            { texto: "2. ¿Qué tubo musculoso conecta la boca con el estómago?", respuesta: "esofago" },
-            { texto: "3. ¿En qué órgano los jugos gástricos mezclan y descomponen los alimentos?", respuesta: "estomago" },
-            { texto: "4. ¿Dónde se absorben los nutrientes principales hacia la sangre?", respuesta: "intestino_delgado" },
-            { texto: "5. ¿Qué órgano absorbe el agua y forma la materia fecal?", respuesta: "intestino_grueso" },
-            { texto: "6. ¿Qué glándula produce la bilis para ayudar a digerir las grasas?", respuesta: "higado" },
-            { texto: "7. ¿Qué órgano produce jugos digestivos e insulina?", respuesta: "pancreas" },
-            { texto: "8. ¿Cuál es el tramo final del tubo digestivo por donde se expulsan los desechos?", respuesta: "recto" },
-            { texto: "9. ¿Qué estructura evita que la comida pase a la vía respiratoria?", respuesta: "epiglotis" }
+        // Banco base de las 9 preguntas (vinculadas a los pines P1-P9)
+        const preguntasOriginales = [
+            { texto: "¿Dónde comienza la digestión y se trituran los alimentos?", respuesta: "boca" },
+            { texto: "¿Qué tubo musculoso conecta la boca con el estómago?", respuesta: "esofago" },
+            { texto: "¿En qué órgano los jugos gástricos mezclan y descomponen los alimentos?", respuesta: "estomago" },
+            { texto: "¿Dónde se absorben los nutrientes principales hacia la sangre?", respuesta: "intestino_delgado" },
+            { texto: "¿Qué órgano absorbe el agua y forma la materia fecal?", respuesta: "intestino_grueso" },
+            { texto: "¿Qué glándula produce la bilis para ayudar a digerir las grasas?", respuesta: "higado" },
+            { texto: "¿Qué órgano produce jugos digestivos e insulina?", respuesta: "pancreas" },
+            { texto: "¿Cuál es el tramo final del tubo digestivo por donde se expulsan los desechos?", respuesta: "recto" },
+            { texto: "¿Qué estructura evita que la comida pase a la vía respiratoria?", respuesta: "epiglotis" }
         ];
 
+        let preguntasMezcladas = [];
         let indiceActual = 0;
         let puntosTotales = 0;
         let respondidoEnEstaPregunta = false;
@@ -148,6 +149,15 @@
         const elAccionesContainer = document.getElementById('acciones-container');
         const btnReintentar = document.getElementById('btn-reintentar');
         const btnContinuar = document.getElementById('btn-continuar');
+
+        // Función para mezclar aleatoriamente el orden de las preguntas
+        function mezclarPreguntas() {
+            preguntasMezcladas = [...preguntasOriginales];
+            for (let i = preguntasMezcladas.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [preguntasMezcladas[i], preguntasMezcladas[j]] = [preguntasMezcladas[j], preguntasMezcladas[i]];
+            }
+        }
 
         function ocultarAcciones() {
             elAccionesContainer.style.display = 'none';
@@ -168,14 +178,15 @@
             ocultarAcciones();
             respondidoEnEstaPregunta = false;
 
-            if (indiceActual < preguntas.length) {
-                elPregunta.textContent = preguntas[indiceActual].texto;
+            if (indiceActual < preguntasMezcladas.length) {
+                // Muestra el número ordinal (1 a 9) según avance el juego aleatorio
+                elPregunta.textContent = `${indiceActual + 1}. ${preguntasMezcladas[indiceActual].texto}`;
                 elMensaje.textContent = '';
                 elMensaje.className = '';
             } else {
                 // Final del juego
                 elPregunta.textContent = `🎉 ¡TRIVIA COMPLETADA! 🎉`;
-                elMensaje.innerHTML = `<span class="correcto">Puntaje Final: ${puntosTotales} de ${preguntas.length * 10} puntos.</span><br><br><small style="color:#FFD700">Presiona el BOTÓN A en la Micro:bit para reiniciar.</small>`;
+                elMensaje.innerHTML = `<span class="correcto">Puntaje Final: ${puntosTotales} de ${preguntasMezcladas.length * 10} puntos.</span><br><br><small style="color:#FFD700">Presiona el BOTÓN A en la Micro:bit para reiniciar con preguntas desordenadas.</small>`;
             }
         }
 
@@ -183,6 +194,7 @@
             indiceActual = 0;
             puntosTotales = 0;
             elPuntos.textContent = puntosTotales;
+            mezclarPreguntas(); // Vuelve a desordenar las preguntas para la nueva partida
             cargarPregunta();
         }
 
@@ -195,9 +207,9 @@
                 return;
             }
 
-            if (indiceActual >= preguntas.length || respondidoEnEstaPregunta) return;
+            if (indiceActual >= preguntasMezcladas.length || respondidoEnEstaPregunta) return;
 
-            const respuestaCorrecta = preguntas[indiceActual].respuesta;
+            const respuestaCorrecta = preguntasMezcladas[indiceActual].respuesta;
 
             if (respuestaLimpia === respuestaCorrecta) {
                 puntosTotales += 10;
@@ -230,7 +242,9 @@
                 elEstado.textContent = "Estado: ¡Micro:bit Conectada!";
                 elEstado.style.color = "#00FF00";
                 btnConectar.style.display = "none";
-                cargarPregunta();
+                
+                // Iniciar partida desordenada
+                reiniciarJuego();
 
                 const textDecoder = new TextDecoderStream();
                 const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
