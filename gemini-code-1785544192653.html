@@ -6,99 +6,164 @@
     <title>Sistema Digestivo - 5to Grado</title>
     <style>
         body {
-            background-color: #000000;
+            background-color: #000;
             color: #FFD700;
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
+            text-align: center;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
-            text-align: center;
             padding: 20px;
             box-sizing: border-box;
         }
-        #boton-conectar {
-            background-color: #FFD700;
-            color: #000000;
-            font-size: 24px;
+
+        #pregunta-box {
+            font-size: 2.2rem;
             font-weight: bold;
-            padding: 15px 30px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
             margin-bottom: 30px;
-            box-shadow: 0px 0px 15px rgba(255, 215, 0, 0.5);
-            transition: transform 0.2s;
-        }
-        #boton-conectar:hover {
-            background-color: #ffffff;
-            transform: scale(1.05);
-        }
-        #pantalla-pregunta {
-            font-size: 38px;
-            font-weight: bold;
+            max-width: 800px;
             line-height: 1.4;
-            max-width: 900px;
-            text-shadow: 0px 0px 10px rgba(255, 215, 0, 0.3);
         }
+
+        #mensaje-box {
+            font-size: 2rem;
+            font-weight: bold;
+            min-height: 60px;
+            margin-bottom: 20px;
+        }
+
+        .correcto {
+            color: #00FF00;
+        }
+
+        .incorrecto {
+            color: #FF3333;
+        }
+
         #estado {
-            font-size: 16px;
-            color: #777;
-            position: absolute;
-            bottom: 20px;
+            position: fixed;
+            bottom: 15px;
+            font-size: 1rem;
+            color: #888;
+        }
+
+        button {
+            background-color: #FFD700;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        button:hover {
+            background-color: #e6c200;
         }
     </style>
 </head>
 <body>
 
-    <button id="boton-conectar" onclick="conectarMicrobit()">🔌 CONECTAR MICRO:BIT</button>
+    <div id="pregunta-box">Cargando pregunta...</div>
+    <div id="mensaje-box"></div>
     
-    <div id="pantalla-pregunta">
-        Haz clic en el botón amarillo para conectar la micro:bit y comenzar el juego.
-    </div>
-
+    <button id="btn-conectar">Conectar Micro:bit</button>
     <div id="estado">Estado: Desconectado</div>
 
     <script>
+        // Banco de preguntas y respuestas correctas (asociadas a los datos que manda la Micro:bit)
+        const preguntas = [
+            { texto: "¿Dónde comienza la digestión y se tritura la comida?", respuesta: "boca" },
+            { texto: "¿Qué órgano mezcla los alimentos con jugos gástricos?", respuesta: "estomago" },
+            { texto: "¿Dónde se absorben los nutrientes principales hacia la sangre?", respuesta: "intestino_delgado" },
+            { texto: "¿Qué órgano absorbe el agua y forma la materia fecal?", respuesta: "intestino_grueso" }
+        ];
+
+        let indiceActual = 0;
+        let port;
+        let reader;
+
+        const elPregunta = document.getElementById('pregunta-box');
+        const elMensaje = document.getElementById('mensaje-box');
+        const elEstado = document.getElementById('estado');
+        const btnConectar = document.getElementById('btn-conectar');
+
+        // Mostrar la primera pregunta al abrir la página
+        function cargarPregunta() {
+            if (indiceActual < preguntas.length) {
+                elPregunta.textContent = `Pregunta ${indiceActual + 1}: ${preguntas[indiceActual].texto}`;
+                elMensaje.textContent = '';
+                elMensaje.className = '';
+            } else {
+                elPregunta.textContent = "¡Felicitaciones! Has completado todo el juego del Sistema Digestivo 🎉";
+                elMensaje.textContent = '';
+            }
+        }
+
+        // Verificar la respuesta enviada por la Micro:bit
+        function procesarRespuesta(respuestaRecibida) {
+            const respuestaLimpia = respuestaRecibida.trim().toLowerCase();
+            const respuestaCorrecta = preguntas[indiceActual].respuesta;
+
+            if (respuestaLimpia === respuestaCorrecta) {
+                elMensaje.textContent = ">>> ¡EXCELENTE! ¡RESPUESTA CORRECTA! <<<";
+                elMensaje.className = "correcto";
+                
+                // Pasar a la siguiente pregunta tras 2 segundos
+                setTimeout(() => {
+                    indiceActual++;
+                    cargarPregunta();
+                }, 2000);
+            } else {
+                elMensaje.textContent = ">>> X INCORRECTO! Intenta con otro órgano. <<<";
+                elMensaje.className = "incorrecto";
+            }
+        }
+
+        // Conexión WebUSB con la Micro:bit
         async function conectarMicrobit() {
             try {
-                // Solicitar la conexión al puerto Serie (USB)
-                const port = await navigator.serial.requestPort();
+                port = await navigator.serial.requestPort();
                 await port.open({ baudRate: 115200 });
-
-                document.getElementById('estado').innerText = "Estado: ¡Micro:bit Conectada!";
-                document.getElementById('boton-conectar').style.display = 'none';
-                document.getElementById('pantalla-pregunta').innerText = "¡Listo! Presiona el BOTÓN A en la micro:bit para comenzar.";
+                
+                elEstado.textContent = "Estado: ¡Micro:bit Conectada!";
+                elEstado.style.color = "#00FF00";
+                btnConectar.style.display = "none";
 
                 const textDecoder = new TextDecoderStream();
-                port.readable.pipeTo(textDecoder.writable);
-                const reader = textDecoder.readable.getReader();
+                const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+                reader = textDecoder.readable.getReader();
 
                 let buffer = "";
-
                 while (true) {
                     const { value, done } = await reader.read();
                     if (done) break;
-                    
-                    buffer += value;
-                    let lineas = buffer.split("\n");
-                    
-                    for (let i = 0; i < lineas.length - 1; i++) {
-                        let texto = lineas[i].trim();
-                        if (texto.length > 0) {
-                            document.getElementById('pantalla-pregunta').innerText = texto;
+                    if (value) {
+                        buffer += value;
+                        let lineas = buffer.split("\n");
+                        buffer = lineas.pop(); // Mantener lo incompleto en el buffer
+                        for (let linea of lineas) {
+                            if (linea.trim() !== "") {
+                                procesarRespuesta(linea);
+                            }
                         }
                     }
-                    buffer = lineas[lineas.length - 1];
                 }
-
             } catch (error) {
-                console.error("Error de conexión:", error);
-                alert("No se pudo conectar a la micro:bit. Asegúrate de usar Google Chrome o Microsoft Edge.");
+                console.error("Error al conectar:", error);
+                elEstado.textContent = "Estado: Error de conexión o cancelado";
             }
         }
+
+        btnConectar.addEventListener('click', conectarMicrobit);
+
+        // Iniciar la primera pregunta al cargar la página
+        window.onload = cargarPregunta;
     </script>
 </body>
 </html>
