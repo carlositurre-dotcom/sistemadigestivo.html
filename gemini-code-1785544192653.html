@@ -50,6 +50,7 @@
             color: #888;
         }
 
+        /* Estilos generales para botones */
         button {
             background-color: #FFD700;
             color: #000;
@@ -59,11 +60,40 @@
             font-weight: bold;
             border-radius: 8px;
             cursor: pointer;
-            margin-top: 15px;
+            margin: 10px;
+            transition: background-color 0.3s ease;
         }
 
         button:hover {
             background-color: #e6c200;
+        }
+
+        /* Contenedor para los botones de acción (oculto por defecto) */
+        #acciones-container {
+            display: none;
+            flex-direction: row;
+            justify-content: center;
+            width: 100%;
+            max-width: 600px;
+            margin-top: 20px;
+        }
+
+        /* Estilo específico para el botón "Intenta nuevamente" (rojo) */
+        #btn-reintentar {
+            background-color: #FF3333;
+            color: #FFF;
+        }
+        #btn-reintentar:hover {
+            background-color: #cc0000;
+        }
+
+        /* Estilo específico para el botón "Continúa" (verde) */
+        #btn-continuar {
+            background-color: #00FF00;
+            color: #000;
+        }
+        #btn-continuar:hover {
+            background-color: #00cc00;
         }
     </style>
 </head>
@@ -72,11 +102,19 @@
     <div id="pregunta-box">Cargando pregunta...</div>
     <div id="mensaje-box"></div>
     
+    <!-- Botón inicial de conexión -->
     <button id="btn-conectar">Conectar Micro:bit</button>
+
+    <!-- Contenedor para los botones de acción, oculto al inicio -->
+    <div id="acciones-container">
+        <button id="btn-reintentar">Intenta nuevamente</button>
+        <button id="btn-continuar">Continúa</button>
+    </div>
+
     <div id="estado">Estado: Desconectado</div>
 
     <script>
-        // Banco de preguntas y respuestas correctas (asociadas a los datos que manda la Micro:bit)
+        // Banco de preguntas y respuestas correctas
         const preguntas = [
             { texto: "¿Dónde comienza la digestión y se tritura la comida?", respuesta: "boca" },
             { texto: "¿Qué órgano mezcla los alimentos con jugos gástricos?", respuesta: "estomago" },
@@ -88,13 +126,36 @@
         let port;
         let reader;
 
+        // Referencias a elementos HTML
         const elPregunta = document.getElementById('pregunta-box');
         const elMensaje = document.getElementById('mensaje-box');
         const elEstado = document.getElementById('estado');
         const btnConectar = document.getElementById('btn-conectar');
+        const elAccionesContainer = document.getElementById('acciones-container');
+        const btnReintentar = document.getElementById('btn-reintentar');
+        const btnContinuar = document.getElementById('btn-continuar');
 
-        // Mostrar la primera pregunta al abrir la página
+        // Ocultar botones de acción
+        function ocultarAcciones() {
+            elAccionesContainer.style.display = 'none';
+        }
+
+        // Mostrar el botón correspondiente
+        function mostrarAccion(tipo) {
+            elAccionesContainer.style.display = 'flex';
+            if (tipo === 'correcto') {
+                btnReintentar.style.display = 'none';
+                btnContinuar.style.display = 'inline-block';
+            } else if (tipo === 'incorrecto') {
+                btnReintentar.style.display = 'inline-block';
+                btnContinuar.style.display = 'none';
+            }
+        }
+
+        // Mostrar la pregunta actual y limpiar mensajes/botones
         function cargarPregunta() {
+            ocultarAcciones(); // Asegurar que los botones estén ocultos al cargar nueva pregunta
+
             if (indiceActual < preguntas.length) {
                 elPregunta.textContent = `Pregunta ${indiceActual + 1}: ${preguntas[indiceActual].texto}`;
                 elMensaje.textContent = '';
@@ -102,28 +163,42 @@
             } else {
                 elPregunta.textContent = "¡Felicitaciones! Has completado todo el juego del Sistema Digestivo 🎉";
                 elMensaje.textContent = '';
+                btnConectar.style.display = "none"; // Ocultar conectar si ya terminó
             }
         }
 
         // Verificar la respuesta enviada por la Micro:bit
         function procesarRespuesta(respuestaRecibida) {
+            // Ignorar datos si ya se completó el juego
+            if (indiceActual >= preguntas.length) return;
+
             const respuestaLimpia = respuestaRecibida.trim().toLowerCase();
             const respuestaCorrecta = preguntas[indiceActual].respuesta;
 
             if (respuestaLimpia === respuestaCorrecta) {
                 elMensaje.textContent = ">>> ¡EXCELENTE! ¡RESPUESTA CORRECTA! <<<";
                 elMensaje.className = "correcto";
-                
-                // Pasar a la siguiente pregunta tras 2 segundos
-                setTimeout(() => {
-                    indiceActual++;
-                    cargarPregunta();
-                }, 2000);
+                mostrarAccion('correcto'); // Mostrar botón "Continúa"
             } else {
                 elMensaje.textContent = ">>> X INCORRECTO! Intenta con otro órgano. <<<";
                 elMensaje.className = "incorrecto";
+                mostrarAccion('incorrecto'); // Mostrar botón "Intenta nuevamente"
             }
         }
+
+        // Lógica de los botones de acción
+        btnReintentar.addEventListener('click', () => {
+            // Limpiar el mensaje de error y ocultar el botón
+            elMensaje.textContent = '';
+            ocultarAcciones();
+            // El usuario debe volver a tocar un órgano en la maqueta
+        });
+
+        btnContinuar.addEventListener('click', () => {
+            // Avanzar a la siguiente pregunta
+            indiceActual++;
+            cargarPregunta();
+        });
 
         // Conexión WebUSB con la Micro:bit
         async function conectarMicrobit() {
@@ -146,7 +221,7 @@
                     if (value) {
                         buffer += value;
                         let lineas = buffer.split("\n");
-                        buffer = lineas.pop(); // Mantener lo incompleto en el buffer
+                        buffer = lineas.pop(); 
                         for (let linea of lineas) {
                             if (linea.trim() !== "") {
                                 procesarRespuesta(linea);
