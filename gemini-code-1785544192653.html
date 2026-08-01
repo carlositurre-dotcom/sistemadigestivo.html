@@ -20,16 +20,26 @@
             box-sizing: border-box;
         }
 
-        /* Marcador de Puntos Superior */
-        #marcador {
+        /* Marcadores Superiores (Puntos y Tiempo) */
+        #top-bar {
             position: absolute;
             top: 20px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .hud-box {
             font-size: 1.8rem;
             font-weight: bold;
             background-color: #111;
             padding: 10px 25px;
             border-radius: 10px;
             border: 2px solid #FFD700;
+        }
+
+        #timer-box {
+            border-color: #FF3333;
+            color: #FF3333;
         }
 
         #pregunta-box {
@@ -80,48 +90,24 @@
         }
 
         button:hover { background-color: #e6c200; }
-
-        #acciones-container {
-            display: none;
-            flex-direction: row;
-            justify-content: center;
-            width: 100%;
-            max-width: 600px;
-            margin-top: 10px;
-        }
-
-        #btn-reintentar {
-            background-color: #FF3333;
-            color: #FFF;
-        }
-        #btn-reintentar:hover { background-color: #cc0000; }
-
-        #btn-continuar {
-            background-color: #00FF00;
-            color: #000;
-        }
-        #btn-continuar:hover { background-color: #00cc00; }
     </style>
 </head>
 <body>
 
-    <!-- Marcador de Puntuación -->
-    <div id="marcador">Puntos: <span id="puntos">0</span></div>
+    <!-- Marcadores Superiores -->
+    <div id="top-bar">
+        <div class="hud-box">Puntos: <span id="puntos">0</span></div>
+        <div class="hud-box" id="timer-box">⏱️ Tiempo: <span id="tiempo">10</span>s</div>
+    </div>
 
     <div id="pregunta-box">Conecta la Micro:bit para comenzar...</div>
     <div id="mensaje-box"></div>
     
     <button id="btn-conectar">🔌 Conectar Micro:bit</button>
 
-    <div id="acciones-container">
-        <button id="btn-reintentar">Intenta nuevamente</button>
-        <button id="btn-continuar">Continúa</button>
-    </div>
-
     <div id="estado">Estado: Desconectado</div>
 
     <script>
-        // Banco base de las 9 preguntas (vinculadas a los pines P1-P9)
         const preguntasOriginales = [
             { texto: "¿Dónde comienza la digestión y se trituran los alimentos?", respuesta: "boca" },
             { texto: "¿Qué tubo musculoso conecta la boca con el estómago?", respuesta: "esofago" },
@@ -137,20 +123,20 @@
         let preguntasMezcladas = [];
         let indiceActual = 0;
         let puntosTotales = 0;
-        let respondidoEnEstaPregunta = false;
+        let bloqueado = false;
+        let tiempoRestante = 10;
+        let timerInterval = null;
+
         let port;
         let reader;
 
         const elPregunta = document.getElementById('pregunta-box');
         const elMensaje = document.getElementById('mensaje-box');
         const elPuntos = document.getElementById('puntos');
+        const elTiempo = document.getElementById('tiempo');
         const elEstado = document.getElementById('estado');
         const btnConectar = document.getElementById('btn-conectar');
-        const elAccionesContainer = document.getElementById('acciones-container');
-        const btnReintentar = document.getElementById('btn-reintentar');
-        const btnContinuar = document.getElementById('btn-continuar');
 
-        // Función para mezclar aleatoriamente el orden de las preguntas
         function mezclarPreguntas() {
             preguntasMezcladas = [...preguntasOriginales];
             for (let i = preguntasMezcladas.length - 1; i > 0; i--) {
@@ -159,80 +145,96 @@
             }
         }
 
-        function ocultarAcciones() {
-            elAccionesContainer.style.display = 'none';
+        // Inicia la cuenta regresiva de 10 segundos
+        function iniciarTemporizador() {
+            detenerTemporizador();
+            tiempoRestante = 10;
+            elTiempo.textContent = tiempoRestante;
+
+            timerInterval = setInterval(() => {
+                tiempoRestante--;
+                elTiempo.textContent = tiempoRestante;
+
+                if (tiempoRestante <= 0) {
+                    detenerTemporizador();
+                    tiempoAgotado();
+                }
+            }, 1000);
         }
 
-        function mostrarAccion(tipo) {
-            elAccionesContainer.style.display = 'flex';
-            if (tipo === 'correcto') {
-                btnReintentar.style.display = 'none';
-                btnContinuar.style.display = 'inline-block';
-            } else if (tipo === 'incorrecto') {
-                btnReintentar.style.display = 'inline-block';
-                btnContinuar.style.display = 'none';
+        function detenerTemporizador() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
             }
         }
 
+        // Caso: Se acabaron los 10 segundos
+        function tiempoAgotado() {
+            bloqueado = true;
+            elMensaje.innerHTML = `<span class="icono-feedback incorrecto">⏰</span> <span class="incorrecto">¡TIEMPO AGOTADO! (0 Puntos)</span>`;
+
+            setTimeout(() => {
+                indiceActual++;
+                cargarPregunta();
+            }, 1500);
+        }
+
         function cargarPregunta() {
-            ocultarAcciones();
-            respondidoEnEstaPregunta = false;
+            bloqueado = false;
 
             if (indiceActual < preguntasMezcladas.length) {
-                // Muestra el número ordinal (1 a 9) según avance el juego aleatorio
                 elPregunta.textContent = `${indiceActual + 1}. ${preguntasMezcladas[indiceActual].texto}`;
                 elMensaje.textContent = '';
                 elMensaje.className = '';
+                iniciarTemporizador(); // Arranca el reloj para la nueva pregunta
             } else {
-                // Final del juego
+                // Final de las 9 preguntas
+                detenerTemporizador();
                 elPregunta.textContent = `🎉 ¡TRIVIA COMPLETADA! 🎉`;
-                elMensaje.innerHTML = `<span class="correcto">Puntaje Final: ${puntosTotales} de ${preguntasMezcladas.length * 10} puntos.</span><br><br><small style="color:#FFD700">Presiona el BOTÓN A en la Micro:bit para reiniciar con preguntas desordenadas.</small>`;
+                elMensaje.innerHTML = `<span class="correcto">Puntaje Final: ${puntosTotales} de ${preguntasMezcladas.length * 10} puntos (${puntosTotales / 10} de ${preguntasMezcladas.length} correctas).</span><br><br><small style="color:#FFD700">Presiona el BOTÓN A en la Micro:bit para volver a jugar.</small>`;
             }
         }
 
         function reiniciarJuego() {
+            detenerTemporizador();
             indiceActual = 0;
             puntosTotales = 0;
             elPuntos.textContent = puntosTotales;
-            mezclarPreguntas(); // Vuelve a desordenar las preguntas para la nueva partida
+            mezclarPreguntas();
             cargarPregunta();
         }
 
         function procesarRespuesta(respuestaRecibida) {
             const respuestaLimpia = respuestaRecibida.trim().toLowerCase();
 
-            // Comando de reinicio desde la Micro:bit (Botón A)
             if (respuestaLimpia === "reiniciar") {
                 reiniciarJuego();
                 return;
             }
 
-            if (indiceActual >= preguntasMezcladas.length || respondidoEnEstaPregunta) return;
+            if (indiceActual >= preguntasMezcladas.length || bloqueado) return;
+
+            // Al responder, detenemos el reloj
+            detenerTemporizador();
+            bloqueado = true; 
 
             const respuestaCorrecta = preguntasMezcladas[indiceActual].respuesta;
 
             if (respuestaLimpia === respuestaCorrecta) {
                 puntosTotales += 10;
                 elPuntos.textContent = puntosTotales;
-                respondidoEnEstaPregunta = true;
-
-                elMensaje.innerHTML = `<span class="icono-feedback">✔️</span> <span class="correcto">¡EXCELENTE! RESPUESTA CORRECTA (+10 Puntos)</span>`;
-                mostrarAccion('correcto');
+                elMensaje.innerHTML = `<span class="icono-feedback">✔️</span> <span class="correcto">¡CORRECTO! (+10 Puntos)</span>`;
             } else {
                 elMensaje.innerHTML = `<span class="icono-feedback incorrecto">❌</span> <span class="incorrecto">INCORRECTO (0 Puntos)</span>`;
-                mostrarAccion('incorrecto');
             }
+
+            // Espera 1.5 segundos para mostrar el feedback y pasa a la siguiente
+            setTimeout(() => {
+                indiceActual++;
+                cargarPregunta();
+            }, 1500);
         }
-
-        btnReintentar.addEventListener('click', () => {
-            elMensaje.textContent = '';
-            ocultarAcciones();
-        });
-
-        btnContinuar.addEventListener('click', () => {
-            indiceActual++;
-            cargarPregunta();
-        });
 
         async function conectarMicrobit() {
             try {
@@ -243,7 +245,6 @@
                 elEstado.style.color = "#00FF00";
                 btnConectar.style.display = "none";
                 
-                // Iniciar partida desordenada
                 reiniciarJuego();
 
                 const textDecoder = new TextDecoderStream();
