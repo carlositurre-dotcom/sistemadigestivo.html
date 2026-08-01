@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Digestivo - 5to Grado</title>
+    <style>
+        body {
+            background-color: #000000;
+            color: #FFD700;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #boton-conectar {
+            background-color: #FFD700;
+            color: #000000;
+            font-size: 24px;
+            font-weight: bold;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-bottom: 30px;
+            box-shadow: 0px 0px 15px rgba(255, 215, 0, 0.5);
+            transition: transform 0.2s;
+        }
+        #boton-conectar:hover {
+            background-color: #ffffff;
+            transform: scale(1.05);
+        }
+        #pantalla-pregunta {
+            font-size: 38px;
+            font-weight: bold;
+            line-height: 1.4;
+            max-width: 900px;
+            text-shadow: 0px 0px 10px rgba(255, 215, 0, 0.3);
+        }
+        #estado {
+            font-size: 16px;
+            color: #777;
+            position: absolute;
+            bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <button id="boton-conectar" onclick="conectarMicrobit()">🔌 CONECTAR MICRO:BIT</button>
+    
+    <div id="pantalla-pregunta">
+        Haz clic en el botón amarillo para conectar la micro:bit y comenzar el juego.
+    </div>
+
+    <div id="estado">Estado: Desconectado</div>
+
+    <script>
+        async function conectarMicrobit() {
+            try {
+                // Solicitar la conexión al puerto Serie (USB)
+                const port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200 });
+
+                document.getElementById('estado').innerText = "Estado: ¡Micro:bit Conectada!";
+                document.getElementById('boton-conectar').style.display = 'none';
+                document.getElementById('pantalla-pregunta').innerText = "¡Listo! Presiona el BOTÓN A en la micro:bit para comenzar.";
+
+                const textDecoder = new TextDecoderStream();
+                port.readable.pipeTo(textDecoder.writable);
+                const reader = textDecoder.readable.getReader();
+
+                let buffer = "";
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += value;
+                    let lineas = buffer.split("\n");
+                    
+                    for (let i = 0; i < lineas.length - 1; i++) {
+                        let texto = lineas[i].trim();
+                        if (texto.length > 0) {
+                            document.getElementById('pantalla-pregunta').innerText = texto;
+                        }
+                    }
+                    buffer = lineas[lineas.length - 1];
+                }
+
+            } catch (error) {
+                console.error("Error de conexión:", error);
+                alert("No se pudo conectar a la micro:bit. Asegúrate de usar Google Chrome o Microsoft Edge.");
+            }
+        }
+    </script>
+</body>
+</html>
