@@ -20,28 +20,44 @@
             box-sizing: border-box;
         }
 
+        /* Marcador de Puntos Superior */
+        #marcador {
+            position: absolute;
+            top: 20px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            background-color: #111;
+            padding: 10px 25px;
+            border-radius: 10px;
+            border: 2px solid #FFD700;
+        }
+
         #pregunta-box {
             font-size: 2.2rem;
             font-weight: bold;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             max-width: 800px;
             line-height: 1.4;
+            margin-top: 60px;
         }
 
         #mensaje-box {
             font-size: 2rem;
             font-weight: bold;
-            min-height: 60px;
+            min-height: 70px;
             margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
         }
 
-        .correcto {
-            color: #00FF00;
+        .icono-feedback {
+            font-size: 2.5rem;
         }
 
-        .incorrecto {
-            color: #FF3333;
-        }
+        .correcto { color: #00FF00; }
+        .incorrecto { color: #FF3333; }
 
         #estado {
             position: fixed;
@@ -50,13 +66,12 @@
             color: #888;
         }
 
-        /* Estilos generales para botones */
         button {
             background-color: #FFD700;
             color: #000;
             border: none;
-            padding: 12px 24px;
-            font-size: 1.1rem;
+            padding: 14px 28px;
+            font-size: 1.2rem;
             font-weight: bold;
             border-radius: 8px;
             cursor: pointer;
@@ -64,48 +79,40 @@
             transition: background-color 0.3s ease;
         }
 
-        button:hover {
-            background-color: #e6c200;
-        }
+        button:hover { background-color: #e6c200; }
 
-        /* Contenedor para los botones de acción (oculto por defecto) */
         #acciones-container {
             display: none;
             flex-direction: row;
             justify-content: center;
             width: 100%;
             max-width: 600px;
-            margin-top: 20px;
+            margin-top: 10px;
         }
 
-        /* Estilo específico para el botón "Intenta nuevamente" (rojo) */
         #btn-reintentar {
             background-color: #FF3333;
             color: #FFF;
         }
-        #btn-reintentar:hover {
-            background-color: #cc0000;
-        }
+        #btn-reintentar:hover { background-color: #cc0000; }
 
-        /* Estilo específico para el botón "Continúa" (verde) */
         #btn-continuar {
             background-color: #00FF00;
             color: #000;
         }
-        #btn-continuar:hover {
-            background-color: #00cc00;
-        }
+        #btn-continuar:hover { background-color: #00cc00; }
     </style>
 </head>
 <body>
 
-    <div id="pregunta-box">Cargando pregunta...</div>
+    <!-- Marcador de Puntuación -->
+    <div id="marcador">Puntos: <span id="puntos">0</span></div>
+
+    <div id="pregunta-box">Conecta la Micro:bit para comenzar...</div>
     <div id="mensaje-box"></div>
     
-    <!-- Botón inicial de conexión -->
-    <button id="btn-conectar">Conectar Micro:bit</button>
+    <button id="btn-conectar">🔌 Conectar Micro:bit</button>
 
-    <!-- Contenedor para los botones de acción, oculto al inicio -->
     <div id="acciones-container">
         <button id="btn-reintentar">Intenta nuevamente</button>
         <button id="btn-continuar">Continúa</button>
@@ -114,33 +121,38 @@
     <div id="estado">Estado: Desconectado</div>
 
     <script>
-        // Banco de preguntas y respuestas correctas
+        // Banco de las 9 preguntas vinculadas a los pines (P1 a P9)
         const preguntas = [
-            { texto: "¿Dónde comienza la digestión y se tritura la comida?", respuesta: "boca" },
-            { texto: "¿Qué órgano mezcla los alimentos con jugos gástricos?", respuesta: "estomago" },
-            { texto: "¿Dónde se absorben los nutrientes principales hacia la sangre?", respuesta: "intestino_delgado" },
-            { texto: "¿Qué órgano absorbe el agua y forma la materia fecal?", respuesta: "intestino_grueso" }
+            { texto: "1. ¿Dónde comienza la digestión y se trituran los alimentos?", respuesta: "boca" },
+            { texto: "2. ¿Qué tubo musculoso conecta la boca con el estómago?", respuesta: "esofago" },
+            { texto: "3. ¿En qué órgano los jugos gástricos mezclan y descomponen los alimentos?", respuesta: "estomago" },
+            { texto: "4. ¿Dónde se absorben los nutrientes principales hacia la sangre?", respuesta: "intestino_delgado" },
+            { texto: "5. ¿Qué órgano absorbe el agua y forma la materia fecal?", respuesta: "intestino_grueso" },
+            { texto: "6. ¿Qué glándula produce la bilis para ayudar a digerir las grasas?", respuesta: "higado" },
+            { texto: "7. ¿Qué órgano produce jugos digestivos e insulina?", respuesta: "pancreas" },
+            { texto: "8. ¿Cuál es el tramo final del tubo digestivo por donde se expulsan los desechos?", respuesta: "recto" },
+            { texto: "9. ¿Qué estructura evita que la comida pase a la vía respiratoria?", respuesta: "epiglotis" }
         ];
 
         let indiceActual = 0;
+        let puntosTotales = 0;
+        let respondidoEnEstaPregunta = false;
         let port;
         let reader;
 
-        // Referencias a elementos HTML
         const elPregunta = document.getElementById('pregunta-box');
         const elMensaje = document.getElementById('mensaje-box');
+        const elPuntos = document.getElementById('puntos');
         const elEstado = document.getElementById('estado');
         const btnConectar = document.getElementById('btn-conectar');
         const elAccionesContainer = document.getElementById('acciones-container');
         const btnReintentar = document.getElementById('btn-reintentar');
         const btnContinuar = document.getElementById('btn-continuar');
 
-        // Ocultar botones de acción
         function ocultarAcciones() {
             elAccionesContainer.style.display = 'none';
         }
 
-        // Mostrar el botón correspondiente
         function mostrarAccion(tipo) {
             elAccionesContainer.style.display = 'flex';
             if (tipo === 'correcto') {
@@ -152,55 +164,64 @@
             }
         }
 
-        // Mostrar la pregunta actual y limpiar mensajes/botones
         function cargarPregunta() {
-            ocultarAcciones(); // Asegurar que los botones estén ocultos al cargar nueva pregunta
+            ocultarAcciones();
+            respondidoEnEstaPregunta = false;
 
             if (indiceActual < preguntas.length) {
-                elPregunta.textContent = `Pregunta ${indiceActual + 1}: ${preguntas[indiceActual].texto}`;
+                elPregunta.textContent = preguntas[indiceActual].texto;
                 elMensaje.textContent = '';
                 elMensaje.className = '';
             } else {
-                elPregunta.textContent = "¡Felicitaciones! Has completado todo el juego del Sistema Digestivo 🎉";
-                elMensaje.textContent = '';
-                btnConectar.style.display = "none"; // Ocultar conectar si ya terminó
+                // Final del juego
+                elPregunta.textContent = `🎉 ¡TRIVIA COMPLETADA! 🎉`;
+                elMensaje.innerHTML = `<span class="correcto">Puntaje Final: ${puntosTotales} de ${preguntas.length * 10} puntos.</span><br><br><small style="color:#FFD700">Presiona el BOTÓN A en la Micro:bit para reiniciar.</small>`;
             }
         }
 
-        // Verificar la respuesta enviada por la Micro:bit
-        function procesarRespuesta(respuestaRecibida) {
-            // Ignorar datos si ya se completó el juego
-            if (indiceActual >= preguntas.length) return;
+        function reiniciarJuego() {
+            indiceActual = 0;
+            puntosTotales = 0;
+            elPuntos.textContent = puntosTotales;
+            cargarPregunta();
+        }
 
+        function procesarRespuesta(respuestaRecibida) {
             const respuestaLimpia = respuestaRecibida.trim().toLowerCase();
+
+            // Comando de reinicio desde la Micro:bit (Botón A)
+            if (respuestaLimpia === "reiniciar") {
+                reiniciarJuego();
+                return;
+            }
+
+            if (indiceActual >= preguntas.length || respondidoEnEstaPregunta) return;
+
             const respuestaCorrecta = preguntas[indiceActual].respuesta;
 
             if (respuestaLimpia === respuestaCorrecta) {
-                elMensaje.textContent = ">>> ¡EXCELENTE! ¡RESPUESTA CORRECTA! <<<";
-                elMensaje.className = "correcto";
-                mostrarAccion('correcto'); // Mostrar botón "Continúa"
+                puntosTotales += 10;
+                elPuntos.textContent = puntosTotales;
+                respondidoEnEstaPregunta = true;
+
+                elMensaje.innerHTML = `<span class="icono-feedback">✔️</span> <span class="correcto">¡EXCELENTE! RESPUESTA CORRECTA (+10 Puntos)</span>`;
+                mostrarAccion('correcto');
             } else {
-                elMensaje.textContent = ">>> X INCORRECTO! Intenta con otro órgano. <<<";
-                elMensaje.className = "incorrecto";
-                mostrarAccion('incorrecto'); // Mostrar botón "Intenta nuevamente"
+                elMensaje.innerHTML = `<span class="icono-feedback incorrecto">❌</span> <span class="incorrecto">INCORRECTO (0 Puntos)</span>`;
+                mostrarAccion('incorrecto');
             }
         }
 
-        // Lógica de los botones de acción
         btnReintentar.addEventListener('click', () => {
-            // Limpiar el mensaje de error y ocultar el botón
             elMensaje.textContent = '';
             ocultarAcciones();
-            // El usuario debe volver a tocar un órgano en la maqueta
         });
 
         btnContinuar.addEventListener('click', () => {
-            // Avanzar a la siguiente pregunta
             indiceActual++;
             cargarPregunta();
         });
 
-        // Conexión WebUSB con la Micro:bit
         async function conectarMicrobit() {
             try {
                 port = await navigator.serial.requestPort();
@@ -209,6 +230,7 @@
                 elEstado.textContent = "Estado: ¡Micro:bit Conectada!";
                 elEstado.style.color = "#00FF00";
                 btnConectar.style.display = "none";
+                cargarPregunta();
 
                 const textDecoder = new TextDecoderStream();
                 const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
@@ -236,9 +258,6 @@
         }
 
         btnConectar.addEventListener('click', conectarMicrobit);
-
-        // Iniciar la primera pregunta al cargar la página
-        window.onload = cargarPregunta;
     </script>
 </body>
 </html>
